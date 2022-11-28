@@ -2,12 +2,15 @@ using System;
 using System.Numerics;
 
 using ImGuiNET;
+
 using ImGuizmoNET;
 
 using Dalamud.Interface;
 
 using Ktisis.Interop;
 using Ktisis.Structs.FFXIV;
+
+using Lumina.Data.Parsing.Uld;
 
 namespace Ktisis.Overlay {
 	public static class OverlayWindow {
@@ -90,6 +93,8 @@ namespace Ktisis.Overlay {
 				Begin();
 				Skeleton.Draw();
 			}
+
+			DebugDraw.Draw();
 
 			if (Selection.DrawQueue.Count > 0) {
 				Begin();

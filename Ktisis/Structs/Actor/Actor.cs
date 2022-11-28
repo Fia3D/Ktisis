@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
+using Dalamud.Interface;
+
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 
@@ -18,6 +20,7 @@ using ImGuiNET;
 
 using ImGuizmoNET;
 
+using Ktisis.Helpers;
 using Ktisis.Overlay;
 using Ktisis.Structs.Bones;
 
@@ -78,7 +81,7 @@ namespace Ktisis.Structs.Actor {
 				var partialSkeleton = Model->Skeleton->PartialSkeletons;
 				if (partialSkeleton == null)
 					return;
-				var headName = "j_kao";
+				const string headName = "j_kao";
 				Bone? headBone = null;
 				for (var p = 0; p < skeleton->PartialSkeletonCount; p++) {
 					var partial = skeleton->PartialSkeletons[p];
@@ -102,7 +105,11 @@ namespace Ktisis.Structs.Actor {
 				if (tar == null)
 					return;
 
-				var lookAtRotation = LookAt(headBone.GetWorldPos(Model), tar->Pos, -Vector3.UnitX, Vector3.UnitZ);
+				var lookAtRotation = LookAt(headBone.GetWorldPos(Model), tar->Pos, Vector3.UnitZ, Vector3.UnitY);
+				DebugDraw.Add(headBone.GetWorldPos(Model), lookAtRotation, 0xFFFFFF00, thickeness:5f);
+				DebugDraw.Add(headBone.GetWorldPos(Model), 3f);
+				DebugDraw.Add(tar->Pos, 3f);
+				DebugDraw.Add(headBone.GetWorldPos(Model), tar->Pos, 0xFFFF00FF, thickeness:5f);
 				var initialRot = headBone.Transform.Rotation.ToQuat();
 				var initialPos = headBone.Transform.Translation.ToVector3();
 				var transform = headBone.Transform;
@@ -113,7 +120,7 @@ namespace Ktisis.Structs.Actor {
 			}
 		}
 
-		private Quaternion LookAt(Vector3 sourcePoint, Vector3 destPoint, Vector3 front, Vector3 up)
+		private static Quaternion LookAt(Vector3 sourcePoint, Vector3 destPoint, Vector3 front, Vector3 up)
 		{
 			Vector3 toVector = Vector3.Normalize(destPoint - sourcePoint);
 
@@ -130,8 +137,8 @@ namespace Ktisis.Structs.Actor {
 			// Axis Angle to Quaternion
 			return AngleAxis(rotAxis, ang);
 		}
-		
-		Quaternion AngleAxis(Vector3 axis, float angle) {
+
+		private static Quaternion AngleAxis(Vector3 axis, float angle) {
 			var s = Math.Sin(angle / 2);
 			var u = Vector3.Normalize(axis);
 			return new Quaternion((float)Math.Cos(angle / 2), (float)(u.X * s), (float)(u.Y * s), (float)(u.Z * s));

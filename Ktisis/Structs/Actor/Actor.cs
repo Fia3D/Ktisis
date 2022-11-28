@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
@@ -8,7 +9,17 @@ using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Ktisis.Interop;
 using Ktisis.Data.Excel;
 using Ktisis.Interop.Hooks;
+
 using Dalamud.Logging;
+
+using FFXIVClientStructs.Havok;
+
+using ImGuiNET;
+
+using ImGuizmoNET;
+
+using Ktisis.Overlay;
+using Ktisis.Structs.Bones;
 
 namespace Ktisis.Structs.Actor {
 	[StructLayout(LayoutKind.Explicit, Size = 0x84A)]
@@ -33,7 +44,7 @@ namespace Ktisis.Structs.Actor {
 
 		public unsafe string? Name => Marshal.PtrToStringAnsi((IntPtr)GameObject.GetName());
 
-		public string GetNameOr(string fallback) => ((ObjectKind)GameObject.ObjectKind == ObjectKind.Pc && !Ktisis.Configuration.DisplayCharName) || string.IsNullOrEmpty(Name)? fallback : Name;
+		public string GetNameOr(string fallback) => ((ObjectKind)GameObject.ObjectKind == ObjectKind.Pc && !Ktisis.Configuration.DisplayCharName) || string.IsNullOrEmpty(Name) ? fallback : Name;
 		public string GetNameOrId() => GetNameOr("Actor #" + ObjectID);
 
 		public unsafe IntPtr GetAddress() {
@@ -49,14 +60,81 @@ namespace Ktisis.Structs.Actor {
 
 		public unsafe void LookAt(Gaze* tar, GazeControl bodyPart) {
 			if (Methods.ActorLookAt == null) return;
-			fixed (ActorGaze* gaze = &Gaze) {
-				Methods.ActorLookAt(
-					gaze,
-					tar,
-					bodyPart,
-					IntPtr.Zero
-				);
+			if (!PoseHooks.PosingEnabled)
+				fixed (ActorGaze* gaze = &Gaze) {
+					Methods.ActorLookAt(
+						gaze,
+						tar,
+						bodyPart,
+						IntPtr.Zero
+					);
+				}
+			else {
+				if (Model == null)
+					return;
+				var skeleton = Model->Skeleton;
+				if (skeleton == null)
+					return;
+				var partialSkeleton = Model->Skeleton->PartialSkeletons;
+				if (partialSkeleton == null)
+					return;
+				var headName = "j_kao";
+				Bone? headBone = null;
+				for (var p = 0; p < skeleton->PartialSkeletonCount; p++) {
+					var partial = skeleton->PartialSkeletons[p];
+					var pose = partial.GetHavokPose(0);
+					if (pose == null)
+						continue;
+					var poseSkeleton = pose->Skeleton;
+					if (poseSkeleton == null)
+						continue;
+					// Find head
+					for (var i = 1; i < poseSkeleton->Bones.Length; i++) {
+						var tempBone = skeleton->GetBone(p, i);
+						if (tempBone.HkaBone.Name.String.Equals(headName))
+							headBone = tempBone;
+					}
+				}
+
+				if (headBone == null)
+					return;
+
+				if (tar == null)
+					return;
+
+				var lookAtRotation = LookAt(headBone.GetWorldPos(Model), tar->Pos, -Vector3.UnitX, Vector3.UnitZ);
+				var initialRot = headBone.Transform.Rotation.ToQuat();
+				var initialPos = headBone.Transform.Translation.ToVector3();
+				var transform = headBone.Transform;
+				transform.Rotation = lookAtRotation.ToHavok();
+				headBone.Transform = transform;
+				
+				Skeleton.PropagateChildren(headBone, &transform, initialPos, initialRot);
 			}
+		}
+
+		private Quaternion LookAt(Vector3 sourcePoint, Vector3 destPoint, Vector3 front, Vector3 up)
+		{
+			Vector3 toVector = Vector3.Normalize(destPoint - sourcePoint);
+
+			// LookAt Axis
+			Vector3 rotAxis = Vector3.Normalize(Vector3.Cross(front, toVector));
+			
+			if (rotAxis.LengthSquared() == 0)
+				rotAxis = up;
+			
+			// Angle around Axis
+			var dot = Vector3.Dot(front, toVector);
+			var ang = (float)Math.Acos(dot);
+
+			// Axis Angle to Quaternion
+			return AngleAxis(rotAxis, ang);
+		}
+		
+		Quaternion AngleAxis(Vector3 axis, float angle) {
+			var s = Math.Sin(angle / 2);
+			var u = Vector3.Normalize(axis);
+			return new Quaternion((float)Math.Cos(angle / 2), (float)(u.X * s), (float)(u.Y * s), (float)(u.Z * s));
 		}
 
 		// Change equipment - no redraw method

@@ -122,10 +122,7 @@ namespace Ktisis.Interface.Windows.Workspace {
 
 			// Gaze control
 			if (ImGui.CollapsingHeader("Gaze Control")) {
-				if (PoseHooks.PosingEnabled)
-					ImGui.TextWrapped("Gaze controls are unavailable while posing.");
-				else
-					EditGaze.Draw(actor);
+				EditGaze.Draw(actor);
 			}
 
 			ImGui.EndTabItem();
